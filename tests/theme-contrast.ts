@@ -138,6 +138,8 @@ try {
     await page.getByRole('button',{name:'Appearance',exact:true}).click();await audit(page,label+' appearance');
     await feedback(page,page.getByRole('button',{name:'Appearance',exact:true}),label+' selected settings tab');
     for(const name of ['Light','Dark','System'])await feedback(page,page.getByRole('button',{name,exact:true}),label+' '+name+' appearance option');
+    await page.getByRole('button',{name:'Phone',exact:true}).click();await page.getByRole('button',{name:'Enable phone connection',exact:true}).waitFor({state:'visible'});await audit(page,label+' phone connection');
+    await feedback(page,page.getByRole('button',{name:'Enable phone connection',exact:true}),label+' phone action');
     await page.getByRole('button',{name:'Close',exact:true}).click();
     await page.getByRole('button',{name:'Add project',exact:true}).click();await audit(page,label+' project form');
     await feedback(page,page.getByRole('dialog').getByRole('button',{name:'Add project',exact:true}),label+' disabled primary action');
@@ -150,7 +152,7 @@ try {
     checks.push(label+' readable menus/text, hover/pressed/focus/disabled states, stable layout, keyboard selection, and Escape');console.log('PASS',checks.at(-1));
   }
   await page.evaluate(()=>window.studio.call('settings',{theme:'dark'}));
-  await page.getByRole('button',{name:'Files',exact:true}).click();await page.getByRole('button',{name:'paper.pdf',exact:true}).click();await page.locator('.pdf-page img').waitFor();
+  await page.getByRole('button',{name:'Files in Books',exact:true}).click();await page.getByRole('button',{name:'paper.pdf',exact:true}).click();await page.locator('.pdf-page img').waitFor();
   await page.getByRole('combobox',{name:'PDF view'}).click();await page.getByRole('option',{name:'Extracted text',exact:true}).waitFor();await audit(page,'dark PDF reader');await page.keyboard.press('Escape');
   await feedback(page,page.getByRole('button',{name:'Previous PDF page',exact:true}),'PDF first-page control');
   await page.emulateMedia({reducedMotion:'reduce'});

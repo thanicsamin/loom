@@ -8,6 +8,7 @@ await Promise.all([
   build({entryPoints:['src/preload.ts'],outfile:'dist/preload.cjs',bundle:true,platform:'node',format:'cjs',external:['electron'],target:'node24'}),
   build({entryPoints:['src/worker.ts'],outfile:'dist/worker.mjs',bundle:true,platform:'node',format:'esm',packages:'external',target:'node24',sourcemap:true}),
   build({entryPoints:['src/engine.ts'],outfile:'dist/engine.mjs',bundle:true,platform:'node',format:'esm',packages:'external',target:'node24',sourcemap:true}),
+  build({entryPoints:['src/companion.ts'],outfile:'dist/companion.mjs',bundle:true,platform:'node',format:'esm',packages:'external',target:'node24'}),
   build({entryPoints:['src/pdf-worker.ts'],outfile:'dist/pdf-worker.mjs',bundle:true,platform:'node',format:'esm',packages:'external',target:'node24'}),
   build({entryPoints:['src/mcp.ts'],outfile:'dist/mcp.cjs',bundle:true,platform:'node',format:'cjs',packages:'external',target:'node24'}),
   build({entryPoints:['src/ui.tsx'],outfile:'dist/ui.js',bundle:true,platform:'browser',format:'iife',target:'chrome140',minify:true,jsx:'automatic',loader:{'.woff2':'file','.woff':'file','.ttf':'file'},assetNames:'fonts/[name]-[hash]',define:{'process.env.NODE_ENV':'"production"'},sourcemap:true}),

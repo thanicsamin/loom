@@ -16,3 +16,13 @@ workspace.json
 runtime/
 .DS_Store
 Thumbs.db
+mobile/www/
+mobile/android/.gradle/
+mobile/android/**/build/
+mobile/android/local.properties
+mobile/android/signing.properties
+*.jks
+*.keystore
+*.p12
+signing.json
+connection.json

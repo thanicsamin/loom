@@ -7,8 +7,18 @@ import { createServer } from 'node:http';
 import { Store, scopedPath } from '../src/store.ts';
 import { Engine } from '../src/engine.ts';
 import { canvasDocument } from '../src/canvas-document.ts';
+import { canvasPreviewDocument } from '../src/canvas-preview-document.ts';
 import { SYSTEM_PROMPT } from '../src/system-prompt.ts';
 const temporary = () => mkdtemp(join(tmpdir(), 'loom-test-'));
+test('Android asset routing preserves authored source and learner state',()=>{
+ const html='<p>Keep studio://app/ as literal lesson text.</p>',state={answer:'studio://app/'};
+ const android=canvasDocument(html,state,'test',{},[],{},'android');
+ assert(android.includes(html));assert(android.includes(JSON.stringify(state)));
+ assert(android.includes('https://appassets.androidplatform.net/assets/canvas-toolkit.js'));
+ assert(android.includes("connect-src 'none'"));
+ assert(canvasPreviewDocument('test',{},'android').includes('https://appassets.androidplatform.net/assets/canvas-preview.js'));
+ assert(canvasDocument(html,state,'test').includes('src="studio://app/canvas-toolkit.js"'));
+});
 async function until(check: () => boolean, ms = 12000) { const start=Date.now(); while(!check()) { if(Date.now()-start>ms)throw Error('Timed out'); await new Promise(r=>setTimeout(r,20)); } }
 
 test('project chat folders and real disk folders remain distinct; paths cannot escape through traversal or links', async () => {
@@ -62,16 +72,17 @@ test('real Pi HTTP stream invokes canvas tool, consumes initial steering, and pr
     assert(requestHeaders.length>=4,'Observe tool continuation, another turn, and compaction requests');
     for(const headers of requestHeaders){assert.equal(headers['x-opencode-session'],chat.id);assert.equal(headers['user-agent'],'loom-studio/0.1.0');}
     const other=await engine.store.newChat({provider:'opencode-go',model:'local'});await engine.send(other.id,'A separate conversation');await until(()=>!engine.runs.get(other.id)?.busy);assert.equal(requestHeaders.at(-1)['x-opencode-session'],other.id);
-  }finally{gate();await engine.close();server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));await rm(root,{recursive:true,force:true});}
+  }finally{gate();await engine.close();server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));await rm(root,{recursive:true,force:true,maxRetries:3,retryDelay:100});}
 });
 
-test('Jev uses the real classifier HTTP protocol and treats low confidence or invalid probabilities as uncertain',async()=>{
+test('Jev uses the real classifier HTTP protocol and treats low confidence or invalid probabilities as uncertain',async(context)=>{
+  let clock=Date.now();context.mock.method(Date,'now',()=>clock);
   const root=await temporary();let malformed=false;let captured:any;
   const server=createServer(async(req,res)=>{let body='';for await(const c of req)body+=c;captured=JSON.parse(body);res.setHeader('Content-Type','application/json');res.end(JSON.stringify({answers:{concept:{type:'choice',choice:'demonstrated',confidence:malformed?.9:.4,probabilities:{missing:0,partial:0,demonstrated:malformed?2:1,contradicted:0}}}}));});await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));
   const engine=new Engine(root,()=>{},join(process.cwd(),'dist/mcp.cjs'));
   try{await engine.init();engine.runtime.registerProvider('typesafe',{apiKey:'local-fixture-key',baseUrl:`http://127.0.0.1:${(server.address() as any).port}`,models:[{type:'classifier',api:'typesafe-system-one',id:'jev-local',name:'Jev fixture',input:['text'],cost:{input:0,output:0,cacheRead:0,cacheWrite:0},contextWindow:32000}]});const chat=await engine.store.newChat();const c=await engine.store.publishCanvas(chat.id,{title:'Concept',html:'<p>A concept</p>',rubric:[{id:'concept',label:'Concept',description:'Frequency is cycles per second.',hint:'Describe one second.'}]});
     engine.store.db.settings.judge='typesafe';engine.store.db.settings.judgeModel='jev-unavailable-free';await assert.rejects(engine.grade(c.id,'Use only the selected judge'),/selected Jev model is unavailable/);assert.equal(typeof captured,'undefined');engine.store.db.settings.judge='typesafe';engine.store.db.settings.judgeModel='jev-local';
-    const grade=await engine.grade(c.id,'Two cycles each second means 2 Hz.');assert.equal(grade.items[0].status,'uncertain');assert.equal(captured.questions.concept.type,'choice');assert.equal(captured.state.answer,'Two cycles each second means 2 Hz.');await assert.rejects(engine.grade(c.id,'again'),/moment/);await new Promise(r=>setTimeout(r,770));malformed=true;assert.equal((await engine.grade(c.id,'same')).items[0].status,'uncertain');
+    const grade=await engine.grade(c.id,'Two cycles each second means 2 Hz.');assert.equal(grade.items[0].status,'uncertain');assert.equal(captured.questions.concept.type,'choice');assert.equal(captured.state.answer,'Two cycles each second means 2 Hz.');await assert.rejects(engine.grade(c.id,'again'),/moment/);clock+=770;malformed=true;assert.equal((await engine.grade(c.id,'same')).items[0].status,'uncertain');
   }finally{await engine.close();server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));await rm(root,{recursive:true,force:true});}
 });
 test('editing a live answer cancels the old Jev request and only the newest judgement completes',async()=>{

@@ -1,0 +1,9 @@
+<resources>
+  <style name="LoomTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+    <item name="android:fontFamily">serif</item>
+    <item name="android:windowLightStatusBar">true</item>
+    <item name="android:colorAccent">#1f695b</item>
+    <item name="android:windowActionModeOverlay">true</item>
+    <item name="android:windowBackground">#fafbf9</item>
+  </style>
+</resources>

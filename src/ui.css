@@ -70,6 +70,7 @@ button:enabled:active,summary:active{background:var(--pressed);transition:none}
 button:disabled{cursor:not-allowed}
 button.active:enabled:hover,.chat-row.selected>button:enabled:hover{background:var(--selected-hover)}
 button.active:enabled:active,.chat-row.selected>button:enabled:active{background:var(--pressed)}
+:is(.primary,.send-button){transition:none}
 :is(.primary,.send-button):enabled:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
 :is(.primary,.send-button):enabled:active{background:var(--primary-pressed);border-color:var(--primary-pressed)}
 button.primary:disabled{background:var(--side);color:var(--muted);border-color:var(--line)}
@@ -102,3 +103,5 @@ a:hover{ text-decoration-thickness:2px;text-underline-offset:3px }
 
 .retry-button{flex-shrink:0;border:1px solid currentColor;border-radius:6px;padding:5px 9px;font-size:inherit;color:var(--ink)}
 .canvas-inline-host{display:contents}
+
+.phone-qr{display:block;width:min(260px,100%);height:auto;border:1px solid var(--line);border-radius:8px;background:white}.phone-panel p{line-height:1.5}.phone-actions{display:flex;flex-wrap:wrap;gap:8px}.phone-actions button{border:1px solid var(--line);padding:7px 10px;border-radius:6px}

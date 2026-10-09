@@ -1,0 +1,27 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'app.loom.studio'
+    compileSdk 36
+    defaultConfig { applicationId 'app.loom.studio'; minSdk 26; targetSdk 36; versionCode 1; versionName '0.1.0'; resValue 'string', 'app_name', 'Loom' }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    sourceSets { main { assets.srcDirs = ['../../www'] } }
+    signingConfigs {
+        release {
+            if (System.getenv('LOOM_ANDROID_KEYSTORE')) {
+                storeFile file(System.getenv('LOOM_ANDROID_KEYSTORE'))
+                storePassword System.getenv('LOOM_ANDROID_STORE_PASSWORD')
+                keyAlias 'loom'
+                keyPassword System.getenv('LOOM_ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        debug { applicationIdSuffix '.debug'; versionNameSuffix '-debug'; resValue 'string', 'app_name', 'Loom (Debug)' }
+        release { minifyEnabled true; shrinkResources true; signingConfig signingConfigs.release; proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro' }
+    }
+}
+dependencies {
+    implementation 'androidx.activity:activity:1.13.0'
+    implementation 'androidx.webkit:webkit:1.17.1'
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+}

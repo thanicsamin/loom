@@ -5,5 +5,5 @@
     "strict": true, "noEmit": true, "allowImportingTsExtensions": true,
     "skipLibCheck": true, "types": ["node"], "esModuleInterop": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "mobile/src/**/*.ts", "mobile/src/**/*.tsx", "tests/**/*.ts"]
 }

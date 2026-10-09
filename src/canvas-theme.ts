@@ -23,7 +23,7 @@ body :where(button,input,select,textarea,summary,a,[tabindex]):focus-visible{out
 body :where(input,select,textarea):hover{border-color:var(--loom-accent)!important}
 body :where(h1,h2,h3,h4){font-family:var(--loom-font)!important;color:var(--loom-ink)!important;line-height:1.3!important}
 body h1{font-size:1.25rem!important}body h2{font-size:1.125rem!important}body h3{font-size:1rem!important}
-body :where(.muted,.sub,.why,small){color:var(--loom-muted)!important}
+body :where(.muted,.sub,.why,.readout,.eyebrow,small){color:var(--loom-muted)!important}
 body a{color:var(--loom-accent)!important}body svg text{font-family:var(--loom-font)!important}
 body table{border-collapse:collapse}body :where(td,th){border-color:var(--loom-line)!important}body th{background:var(--loom-soft)!important}
 body :where(.formula,[data-math]){font-family:inherit!important;color:var(--loom-ink)!important}

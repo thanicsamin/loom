@@ -2,6 +2,8 @@
 
 A local desktop chat for studying books and papers through interactive HTML explanations.
 
+An Android companion shares the desktop's chats, subscriptions, and library while rendering lessons on the phone. Install and build instructions: [ANDROID.md](ANDROID.md).
+
 ## Run
 
 ```sh
