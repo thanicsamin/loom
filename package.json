@@ -1,0 +1,95 @@
+{
+  "name": "loom-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A canvas-first AI workspace powered by Pi",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --import tsx --test tests/*.test.ts",
+    "test:desktop": "npm run build && node --import tsx tests/desktop-smoke.ts",
+    "test:contrast": "npm run build && node --import tsx tests/theme-contrast.ts",
+    "test:live": "npm run build && node --import tsx tests/live-promo.ts",
+    "package": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "test:clipboard": "npm run build && node --import tsx tests/clipboard-e2e.ts",
+    "test:reading": "npm run build && node --import tsx tests/reading-style.ts",
+    "test:canvas-stream": "npm run build && node --import tsx tests/canvas-stream-e2e.ts",
+    "test:thinking": "npm run build && node --import tsx tests/thinking-e2e.ts",
+    "test:katex": "npm run build && node --import tsx tests/katex-embedded.ts",
+    "test:teaching": "npm run build && node --import tsx tests/teaching-live.ts",
+    "test:quizzes": "npm run build && node --import tsx tests/teaching-quiz.ts"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^1.7.0",
+    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/pi-coding-agent": "1.1.0",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "chart.js": "^4.5.1",
+    "dompurify": "3.4.16",
+    "katex": "0.19.0",
+    "lucide-react": "^0.468.0",
+    "marked": "18.0.11",
+    "pdf-parse": "^2.4.5",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "typebox": "1.3.27",
+    "undici": "8.10.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "computer-modern": "0.1.3",
+    "electron": "44.4.2",
+    "electron-builder": "^26.0.12",
+    "esbuild": "0.25.12",
+    "playwright-core": "1.58.2",
+    "tsx": "4.21.0",
+    "typescript": "6.0.2"
+  },
+  "build": {
+    "appId": "app.loom.studio",
+    "productName": "Loom",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Education",
+      "icon": "assets/logo.png"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.education"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thanicsamin/loom.git"
+  },
+  "license": "MIT"
+}

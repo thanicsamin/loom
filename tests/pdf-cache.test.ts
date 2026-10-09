@@ -1,0 +1,9 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,writeFile,rm,utimes} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join,resolve} from 'node:path';
+import {PDFService} from '../src/pdf.ts';import {pdfFixture} from './fixtures.ts';
+test('PDF search supplies cached physical pages, duplicate reads share work, and edits invalidate the cache',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'loom-pdf-cache-')),path=join(root,'paper.pdf'),pdf=new PDFService(resolve('dist/pdf-worker.mjs'));await writeFile(path,pdfFixture());
+ try{const found=await pdf.read(path,'search',undefined,'Amplitude');assert(found.matches.some((m:any)=>m.page===2));assert.equal(found._textPages,undefined,'Internal page caching stays out of tool results');const workers=pdf.metrics.workerStarts;const start=performance.now(),page=await pdf.read(path,'text',[2]);assert.match(page.pages[0].text,/Amplitude is maximum displacement/);assert.equal(pdf.metrics.workerStarts,workers,'Reading a matched passage avoids a second parser startup');assert(performance.now()-start<100);
+  const rendered=await Promise.all([pdf.read(path,'render',[2]),pdf.read(path,'render',[2])]);assert.equal(rendered[0].pages[0].dataUrl,rendered[1].pages[0].dataUrl);assert.equal(pdf.metrics.workerStarts,workers+1,'Concurrent identical requests share one worker');rendered[0].pages[0].dataUrl='mutated';assert.notEqual((await pdf.read(path,'render',[2])).pages[0].dataUrl,'mutated');
+  await writeFile(path,Buffer.from(pdfFixture().toString('latin1').replaceAll('Amplitude','Frequency'),'latin1'));const future=new Date(Date.now()+1000);await utimes(path,future,future);const changed=await pdf.read(path,'text',[2]);assert.match(changed.pages[0].text,/Frequency is maximum displacement/);assert(!changed.pages[0].text.includes('Amplitude'));assert.equal(pdf.metrics.workerStarts,workers+2);
+ }finally{pdf.close();await rm(root,{recursive:true,force:true});}
+});

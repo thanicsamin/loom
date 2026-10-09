@@ -1,0 +1,17 @@
+# Architecture
+
+The Electron main process owns the window, native dialogs, a restricted custom URL scheme, and the preload bridge. The React UI uses a narrow IPC interface. Context isolation, renderer sandboxing, and disabled Node integration keep generated content separate from the application's native capabilities.
+
+An engine worker first loads only local persistence and sends a small startup snapshot. Saved HTML can be read directly before the separate engine bundle imports Pi and provider SDKs. The main process requests that import after the first window loads; provider/account discovery continues in the background. Early actions wait for engine readiness, while typing and saved canvas rendering remain available. The loaded Store is handed to the engine without rereading the database.
+
+Network streams become incremental UI events. The renderer collects text deltas and applies them once per animation frame. An authoritative state snapshot discards pending deltas already included in that snapshot, avoiding duplicated text. Drafts and canvas state are debounced; Markdown rendering is memoized, and initial history rendering is bounded to 60 messages. Updating saved interactions does not reload an iframe. Routine state snapshots omit HTML and revision sources; those are fetched on demand.
+
+Each explainer is an opaque-origin iframe with scripts enabled. A trusted document head installs its CSP and a small `Studio` bridge before any generated source. Network, native APIs, forms, nested frames, and parent DOM access are blocked. Per-frame tokens and the sender window protect parent messaging. HTML/CSS/JS remains unrestricted within that boundary. The toolkit supplies Chart.js and KaTeX without remote assets. Canvas source, rubric, versions, and state are saved independently from model context.
+
+Pi exposes only Loom's custom tools for files, sources, canvases, and memory. The Codex adapter supplies those same tools through experimental app-server dynamic tools. Claude and Gemini connect to a local MCP bridge. Its authenticated HTTP endpoint listens on loopback. Native command/shell approval requests are declined; scoped Loom tools are permitted. Tool inputs are schema-checked and paths are canonicalized against a workspace, including symlink containment.
+
+PDF parsing is lazy and uses dedicated workers. Text responses contain physical page numbers and truncation markers. Rendered page images support mathematical material and scans without pretending OCR has succeeded. HTTPS paper requests reject private destinations, pin validated DNS addresses, validate redirects, cap response size, and retain provenance.
+
+Memory is per chat. `LOG.txt` contains fixed-width, append-only UTF-8 note records. Aligned binary summary records live in `TREE/2`, `TREE/4`, and so on. A bounded wake view uses coarser old ranges and finer recent ranges. Missing caches are explicit and can be zoomed. Summary repair invalidates dependent cached ranges; raw notes stay intact. The model creates summaries at useful task boundaries, with no hidden summarizer service or extra background model charges.
+
+The current prototype stores JSON locally with serialized atomic file replacement. It is suited to a personal library/chat workspace. Full-text indexing, library-wide retrieval, automatic OCR, cross-device synchronization, voice, model evals, and signed release distribution are future work.

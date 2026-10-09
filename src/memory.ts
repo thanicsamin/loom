@@ -1,0 +1,35 @@
+import { mkdir, open, stat } from 'node:fs/promises';
+import { join } from 'node:path';
+
+type Range = { lo: number; hi: number };
+const LOG_BYTES=320,TREE_BYTES=288;
+function line(value: unknown) { if(typeof value!=='string'||!value.trim()||/[\r\n\0]/.test(value)||Buffer.byteLength(value.trim())>280)throw Error('A memory is one nonempty line of at most 280 UTF-8 bytes.');return value.trim(); }
+function block(id:string):Range { const m=/^(\d+)-(\d+)$/.exec(id);if(!m)throw Error('Use a range printed by memory_read.');const lo=Number(m[1]),hi=Number(m[2])+1,n=hi-lo;if(!Number.isSafeInteger(hi)||n<2||!Number.isInteger(Math.log2(n))||lo%n)throw Error('Use an aligned binary memory range.');return{lo,hi}; }
+const idOf=({lo,hi}:Range)=>hi-lo===1?`#${lo}`:`#${lo}-${hi-1}`;
+function pad(text:string,width:number) {const bytes=Buffer.from(text);if(bytes.length>=width)throw Error('Memory record too long.');const record=Buffer.alloc(width,32);bytes.copy(record);record[width-1]=10;return record;}
+
+// An independent TypeScript implementation of OptMem's append-only notes and
+// aligned binary summaries. Each read seeks to a record; raw notes never change.
+export class Memory {
+  private writes:Promise<unknown>=Promise.resolve();
+  constructor(private directory:string){}
+  private log(){return join(this.directory,'LOG.txt');}
+  private tree(size:number){return join(this.directory,'TREE',String(size));}
+  private async count(path=this.log(),width=LOG_BYTES){try{return Math.floor((await stat(path)).size/width);}catch(e:any){if(e.code==='ENOENT')return 0;throw e;}}
+  private serial<T>(fn:()=>Promise<T>):Promise<T>{const job=this.writes.catch(()=>{}).then(fn);this.writes=job;return job;}
+  async init(){await mkdir(join(this.directory,'TREE'),{recursive:true,mode:0o700});const file=await open(this.log(),'a+',0o600);try{const bytes=(await file.stat()).size;if(bytes%LOG_BYTES)await file.truncate(bytes-bytes%LOG_BYTES);}finally{await file.close();}}
+  private async raw(lo:number,hi:number){const file=await open(this.log(),'r');try{const buffer=Buffer.alloc((hi-lo)*LOG_BYTES);const {bytesRead}=await file.read(buffer,0,buffer.length,lo*LOG_BYTES);const lines:string[]=[];for(let i=0;i<bytesRead;i+=LOG_BYTES)lines.push(buffer.subarray(i,i+LOG_BYTES).toString('utf8').trimEnd());return lines;}finally{await file.close();}}
+  private async summary(range:Range){const file=await open(this.tree(range.hi-range.lo),'r').catch((e:any)=>{if(e.code==='ENOENT')return undefined;throw e;});if(!file)return undefined;try{const bytes=Buffer.alloc(TREE_BYTES);await file.read(bytes,0,TREE_BYTES,range.lo/(range.hi-range.lo)*TREE_BYTES);return bytes.toString('utf8').replaceAll('\0','').trim()||undefined;}finally{await file.close();}}
+  private async display(range:Range){return range.hi-range.lo===1?(await this.raw(range.lo,range.hi))[0]:`${idOf(range)} ${await this.summary(range) || '[Summary pending. Use memory_read zoom to retrieve details.]'}`;}
+  async pending(){const total=await this.count();for(let size=2;size<=total;size*=2){const have=await this.count(this.tree(size),TREE_BYTES);if(have<Math.floor(total/size)){const r={lo:have*size,hi:(have+1)*size};return {id:`${r.lo}-${r.hi-1}`,inputs:size<=16?await this.raw(r.lo,r.hi):[await this.display({lo:r.lo,hi:r.lo+size/2}),await this.display({lo:r.lo+size/2,hi:r.hi})]};}}return null;}
+  async note(text:unknown){const value=line(text);return this.serial(async()=>{await this.init();const total=await this.count();const recent=await this.raw(Math.max(0,total-32),total);const duplicate=recent.find(x=>x.slice(x.indexOf(' ',x.indexOf(' ')+1)+1)===value);if(duplicate)return{duplicate:true,id:duplicate.split(' ')[0],pending:await this.pending()};const file=await open(this.log(),'a',0o600);try{await file.write(pad(`#${total} ${new Date().toISOString().slice(0,10)} ${value}`,LOG_BYTES));await file.sync();}finally{await file.close();}return{id:`#${total}`,pending:await this.pending()};});}
+  async merge(id:string,text:unknown){const value=line(text),range=block(id);return this.serial(async()=>{await this.init();const pending=await this.pending();if(pending?.id!==id)throw Error('Complete the pending merge first. Read memory_read mode wake.');const file=await open(this.tree(range.hi-range.lo),'a+',0o600);try{const index=range.lo/(range.hi-range.lo);await file.close();const writable=await open(this.tree(range.hi-range.lo),'r+');try{await writable.write(pad(value,TREE_BYTES),0,TREE_BYTES,index*TREE_BYTES);await writable.sync();}finally{await writable.close();}}catch(e){await file.close().catch(()=>{});throw e;}return{saved:id,pending:await this.pending()};});}
+  async wake(budget=96){await this.init();const total=await this.count();if(!total)return{total,lines:[],pending:null};const root=2**Math.ceil(Math.log2(total));
+    const cover=(alpha:number)=>{const ranges:Range[]=[],stack:Range[]=[{lo:0,hi:root}];while(stack.length){const r=stack.pop()!;if(r.lo>=total)continue;const size=r.hi-r.lo;if(size>1&&(r.hi>total||size>alpha*(total-r.lo))){const mid=r.lo+size/2;stack.push({lo:mid,hi:r.hi},{lo:r.lo,hi:mid});}else ranges.push(r);}return ranges;};
+    let low=0,high=1;for(let i=0;i<40;i++){const mid=(low+high)/2;if(cover(mid).length>budget)low=mid;else high=mid;}const ranges=cover(high);while(ranges.length<budget){const index=ranges.findLastIndex(r=>r.hi-r.lo>1);if(index<0)break;const r=ranges[index],mid=(r.lo+r.hi)/2;ranges.splice(index,1,{lo:r.lo,hi:mid},{lo:mid,hi:r.hi});}
+    return{total,lines:await Promise.all(ranges.map(r=>this.display(r))),pending:await this.pending()};
+  }
+  async zoom(id:string){await this.init();const range=block(id);if(range.hi>await this.count())throw Error('Memory range not found.');const mid=(range.lo+range.hi)/2;return[await this.display({lo:range.lo,hi:mid}),await this.display({lo:mid,hi:range.hi})];}
+  async recall(query:string,cursor=0){if(typeof query!=='string'||!query.trim()||query.length>200||!Number.isSafeInteger(cursor)||cursor<0)throw Error('Enter a short search phrase and valid cursor.');await this.init();const total=await this.count(),matches:string[]=[];let next=cursor;for(let start=cursor;start<total;start+=1024){const records=await this.raw(start,Math.min(total,start+1024));for(let i=0;i<records.length;i++){next=start+i+1;if(records[i].toLowerCase().includes(query.toLowerCase()))matches.push(records[i]);if(matches.length===40)return{matches,nextCursor:next,total};}if(next-cursor>=100000)return{matches,nextCursor:next,total};}return{matches,nextCursor:null,total};}
+  async forget(id:string){const range=block(id);return this.serial(async()=>{const total=await this.count();if(range.hi>total)throw Error('Memory range not found.');for(let size=range.hi-range.lo;size<=total;size*=2){const path=this.tree(size),file=await open(path,'r+').catch((e:any)=>{if(e.code==='ENOENT')return undefined;throw e;});if(file)try{const offset=Math.floor(range.lo/size)*TREE_BYTES;if((await file.stat()).size>offset){await file.truncate(offset);await file.sync();}}finally{await file.close();}}return{forgotSummary:id,rawNotesPreserved:true,pending:await this.pending()};});}
+}
