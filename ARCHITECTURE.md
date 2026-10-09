@@ -19,3 +19,5 @@ PDF parsing is lazy and uses dedicated workers. Text responses contain physical 
 Memory is per chat. `LOG.txt` contains fixed-width, append-only UTF-8 note records. Aligned binary summary records live in `TREE/2`, `TREE/4`, and so on. A bounded wake view uses coarser old ranges and finer recent ranges. Missing caches are explicit and can be zoomed. Summary repair invalidates dependent cached ranges; raw notes stay intact. The model creates summaries at useful task boundaries, with no hidden summarizer service or extra background model charges.
 
 The current prototype stores JSON locally with serialized atomic file replacement. It is suited to a personal library/chat workspace. Full-text indexing, library-wide retrieval, automatic OCR, cross-device synchronization, voice, model evals, and signed release distribution are future work.
+
+Canvas expansion keeps the same iframe document mounted and persists state in the background, so expansion does not restart lesson scripts or wait on a disk write. Antigravity exposes every model in its advertised catalog, including non-Google families; thinking variants are derived from the catalog labels and matching slugs.

@@ -20,12 +20,13 @@ export function antigravityRules(prompt:string):string[]{
 export function antigravityModels(output:string):AntigravityModel[]{
  const models=new Map<string,AntigravityModel>();
  for(const line of output.split('\n')){
-  const match=/^\s*(gemini-\S+)\s+(.+?)\s*$/.exec(line);if(!match)continue;
-  const [,slug,label]=match,variant=/^(.*)-(low|medium|high|xhigh|max)$/.exec(slug);
+  const match=/^\s*([a-zA-Z0-9][a-zA-Z0-9._-]*)(?:\t+| {2,})(.+?)\s*$/.exec(line);if(!match)continue;
+  const [,slug,label]=match,effort=/\s+\(([^()]+)\)\s*$/.exec(label)?.[1]?.toLowerCase().replaceAll(' ','-');
+  const variant=effort&&slug.endsWith('-'+effort)?[slug,slug.slice(0,-effort.length-1),effort]:undefined;
   if(!variant){if(!models.has(slug))models.set(slug,{id:slug,name:label,vision:false,variants:{'':slug}});continue;}
   const [,id,level]=variant;let model=models.get(id);
   if(!model){model={id,name:label.replace(/\s*\([^)]*\)\s*$/,''),vision:false,thinking:[],defaultThinking:level,variants:{}};models.set(id,model);}
-  if(!model.variants[level]){model.variants[level]=slug;model.thinking!.push({value:level,label:thinkingLabel(level)});}
+  if(!model.variants[level]){model.variants[level]=slug;(model.thinking||=[]).push({value:level,label:thinkingLabel(level)});}
  }
  return [...models.values()];
 }
@@ -62,7 +63,7 @@ export class AntigravityRun implements NativeRun{
   await writeFile(join(cwd,'AGENTS.md'),parts[0]||'',{mode:0o600});
   for(let i=1;i<parts.length;i++)await writeFile(join(rules,`loom-${String(i).padStart(3,'0')}.md`),'---\ntrigger: always_on\ndescription: Loom teaching instructions continued\n---\n'+parts[i],{mode:0o600});
   await writeFile(join(cwd,'.agents/mcp_config.json'),JSON.stringify({mcpServers:{studio:config.mcpServers[0]}}),{mode:0o600});
-  const effort=this.options.chat.thinking||this.model.defaultThinking||'',slug=this.model.variants[effort];if(!slug)throw Error('This Gemini model or thinking level is no longer available. Refresh Accounts.');
+  const effort=this.options.chat.thinking||this.model.defaultThinking||'',slug=this.model.variants[effort];if(!slug)throw Error('This Antigravity model or thinking level is no longer available. Refresh Accounts.');
   if(this.cancelled)throw Error('The response was stopped.');
   // Without a new project the CLI can reuse its last desktop workspace and
   // silently ignore the custom primary agent in this chat's directory.
@@ -75,7 +76,7 @@ export class AntigravityRun implements NativeRun{
    let e:any;try{e=JSON.parse(line);}catch{return;}
    if(e.event==='init'){if(e.init?.model!==slug){this.finish(Error('Antigravity selected a different model than requested.'));this.close();return;}this.initialized=true;if(e.conversation_id)this.options.saveSession(e.conversation_id);}
    if(e.event==='step_update'){const s=e.step_update;if(typeof s?.text_delta==='string'&&s.text_delta){this.streamed=true;this.options.delta(s.text_delta);}if(s?.step_type==='tool')this.options.activity(s.state==='DONE'?'':s.tool_info?.parameters?.ToolName||'Working');}
-   if(e.event==='result'){if(e.result?.status==='SUCCESS'){if(!this.streamed&&typeof e.result.response==='string')this.options.delta(e.result.response);this.finish();}else{this.finish(Error(e.result?.error||'Antigravity did not complete the response. Check its sign-in and quota.'));this.close();}}
+   if(e.event==='result'){if(e.result?.status==='SUCCESS'){if(!this.streamed&&typeof e.result.response==='string')this.options.delta(e.result.response);this.finish();}else{const detail=e.result?.error,error=Error(typeof detail==='string'?detail:typeof detail?.message==='string'?detail.message:'Antigravity did not complete the response. Check its sign-in and quota.');if(detail&&typeof detail==='object')Object.assign(error,{status:detail.status??detail.statusCode});this.finish(error);this.close();}}
   });
  }
  private finish(error?:Error){const p=this.pending;if(!p)return;this.pending=undefined;clearTimeout(p.timer);this.options.activity('');if(error)p.reject(error);else p.resolve();}
@@ -85,7 +86,7 @@ export class AntigravityRun implements NativeRun{
   if(this.startupError)throw this.startupError;
   let current=(fresh&&this.initialContext?this.initialContext+'\n\nCurrent learner request:\n':'')+text;
   do{
-   this.streamed=false;await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>{this.finish(Error('Gemini did not finish within ten minutes.'));this.close();},600000);this.pending={resolve,reject,timer};this.child!.stdin.write(JSON.stringify({event:'user',message:{content:current}})+'\n',error=>{if(error)this.finish(error);});});
+   this.streamed=false;await new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>{this.finish(Error('Antigravity did not finish within ten minutes.'));this.close();},600000);this.pending={resolve,reject,timer};this.child!.stdin.write(JSON.stringify({event:'user',message:{content:current}})+'\n',error=>{if(error)this.finish(error);});});
    const next=this.queued.splice(0);if(!next.length)break;current=next.map(n=>n.text).join('\n\n');
   }while(!this.cancelled);
  }

@@ -15,7 +15,7 @@ If your npm configuration blocks install scripts, run `node node_modules/electro
 
 Choose a provider in the chat header. Connect accounts in **Settings & connections**. Add a project folder to access your textbooks and papers. Click a PDF in **Files** to view pages, extracted text, or tables, then use **Explain this page**. Drag files into the window, use the attachment button, or paste an image.
 
-**Enter** sends a message. During a response, **Enter** steers the active run. **Shift+Enter** inserts a line break. **Stop** cancels a response. Silent requests show a waiting state, stop after two minutes without progress, and offer **Retry** with the original message and attachments. Empty responses show an error; partial replies stay in the chat. Total response time is bounded to ten minutes. **Ctrl/Cmd+N** creates a chat; **Ctrl/Cmd+K** searches chats.
+**Enter** sends a message. During a response, **Enter** steers the active run. **Shift+Enter** inserts a line break. **Stop** cancels a response. Provider outages, unavailable models, expired sign-ins, and quota errors show a recovery message without automatic retries. Silent requests show a waiting state, stop after two minutes without progress, and offer **Retry** with the original message and attachments. Empty responses show an error; partial replies stay in the chat. Total response time is bounded to ten minutes. **Ctrl/Cmd+N** creates a chat; **Ctrl/Cmd+K** searches chats.
 
 ## Learning tools
 
@@ -35,7 +35,7 @@ Choose a provider in the chat header. Connect accounts in **Settings & connectio
 | --- | --- |
 | Codex subscription | Official `codex app-server` when installed; Pi subscription fallback otherwise |
 | Claude subscription | Official signed-in Claude Code CLI, streaming JSON + Loom MCP tools |
-| Gemini subscription | Official signed-in Antigravity CLI (`agy`), streaming JSON + Loom MCP tools; Gemini CLI/ACP when Antigravity is absent |
+| Google / Antigravity subscription | Official signed-in Antigravity CLI (`agy`), streaming JSON + Loom MCP tools; Gemini CLI/ACP when Antigravity is absent |
 | OpenCode Go | Pi, with a Go subscription key |
 | Jev feedback | Pi classifier route through TypeSafe AI, OpenRouter, or OpenCode Zen |
 
@@ -45,7 +45,7 @@ Loom prefers a verified private Codex installation in its data directory's `runt
 
 GPT-6.1 Sol and speed options come from the installed Codex runtime's model catalog. **Sol Ultrafast** appears as a speed option but is disabled unless that runtime/account advertises it. Loom does not silently substitute another tier. See the [official Codex speed documentation](https://learn.chatgpt.com/docs/agent-configuration/speed).
 
-Gemini models and thinking levels come from `agy models`, including Gemini 3.8 Flash when advertised. Loom pins the chosen model and uses the CLI’s existing Google subscription sign-in. It does not extract Google OAuth tokens, call private Google endpoints, or fall back to a separately billed API key. The current Antigravity input protocol accepts text; project PDFs can supply extracted text, while direct image inputs need another provider. See the [official headless protocol](https://antigravity.google/docs/cli/headless/).
+All Antigravity models and thinking levels come from `agy models`, including Gemini, Claude Opus/Sonnet, and GPT-OSS when advertised. Only listed models and thinking variants are selectable. Loom pins the chosen model and uses the CLI’s existing Google subscription sign-in. It does not extract Google OAuth tokens, call private Google endpoints, or fall back to a separately billed API key. The current Antigravity input protocol accepts text; project PDFs can supply extracted text, while direct image inputs need another provider. See the [official headless protocol](https://antigravity.google/docs/cli/headless/).
 
 Jev requests use the selected provider's API credits. OpenCode Zen and Go have separate credentials. A missing judge or uncertain answer produces an explicit state, never a fabricated score. Editing pauses debounce checks, and HTTP 429 responses block more judge requests until the provider’s `Retry-After` period ends (one minute when absent). Loom does not automatically retry failed chat requests. Provider terms, account limits, and enforcement still apply; an official CLI integration is not a guarantee against account restrictions.
 

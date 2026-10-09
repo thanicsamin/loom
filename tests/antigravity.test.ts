@@ -7,8 +7,8 @@ import {AntigravityRun,antigravityModels,antigravityRules} from '../src/antigrav
 import type {Chat} from '../src/shared.ts';
 
 test('Antigravity catalogs derive model groups and thinking levels only from advertised variants',()=>{
- const models=antigravityModels('Fetching models...\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\ngemini-3.8-flash-low\tGemini 3.8 Flash (Low)\ngemini-9-new-max\tGemini 9 New (Max)\nclaude-opus-high\tClaude\ngemini-custom\tCustom Gemini\n');
- assert.equal(models.length,3);assert.equal(models[0].id,'gemini-3.8-flash');assert.deepEqual(models[0].thinking?.map(t=>t.value),['high','low']);assert.equal(models[0].variants.low,'gemini-3.8-flash-low');assert.equal(models[1].thinking?.[0].value,'max');assert.equal(models[2].thinking,undefined);assert.equal(models[2].variants[''],'gemini-custom');
+ const models=antigravityModels('Fetching models...\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\ngemini-3.8-flash-low\tGemini 3.8 Flash (Low)\ngemini-9-new-max\tGemini 9 New (Max)\nclaude-opus-5-5-low\tClaude Opus 5.5 (Low)\nclaude-opus-5-5-high\tClaude Opus 5.5 (High)\ngpt-oss-120b-medium\tGPT-OSS 120B (Medium)\nother-future-balanced\tOther Future (Balanced)\ngemini-custom\tCustom Gemini\n');
+ assert.equal(models.length,6);assert.equal(models[0].id,'gemini-3.8-flash');assert.deepEqual(models[0].thinking?.map(t=>t.value),['high','low']);assert.equal(models[0].variants.low,'gemini-3.8-flash-low');assert.equal(models[1].thinking?.[0].value,'max');assert.equal(models[2].id,'claude-opus-5-5');assert.deepEqual(models[2].thinking?.map(t=>t.value),['low','high']);assert.equal(models[3].id,'gpt-oss-120b');assert.equal(models[3].variants.medium,'gpt-oss-120b-medium');assert.equal(models[4].variants.balanced,'other-future-balanced');assert.equal(models[5].thinking,undefined);assert.equal(models[5].variants[''],'gemini-custom');
 });
 test('Antigravity subscription transport pins the real slug, streams, reuses context, queues steering, and reports errors',async()=>{
  const root=await mkdtemp(join(tmpdir(),'loom-agy-test-')),cli=join(root,'agy'),log=join(root,'wire.jsonl');
@@ -20,6 +20,11 @@ test('Antigravity subscription transport pins the real slug, streams, reuses con
   const pending=run.prompt('first');await run.steer('steering');await pending;assert.equal(text,'firststeering');assert.equal(session,'real-session');assert(run.hasContext());await run.prompt('followup');assert.equal(text,'firststeeringfollowup');
   const rows=(await readFile(log,'utf8')).trim().split('\n').map(x=>JSON.parse(x));assert.equal(rows.filter(r=>r.args).length,1);assert(rows[0].args.includes('gemini-3.8-flash-low'));assert(rows[0].args.includes('--new-project'));assert.equal(await readFile(join(root,'antigravity',chat.id,'AGENTS.md'),'utf8'),'Teach clearly.');assert(JSON.parse(await readFile(join(root,'antigravity',chat.id,'.agents/mcp_config.json'),'utf8')).mcpServers.studio.command);assert(!rows[0].apiKey&&!rows[0].googleKey);const agent=await readFile(join(root,'antigravity',chat.id,'.agents/agents/loom/agent.md'),'utf8');assert(agent.includes('subagent: false'));assert(agent.includes('commandExecutionPolicy: "off"'));assert(agent.includes('tools: ["list_dir"]'));assert(agent.includes('STUDIO_CHAT_ID'));assert(!agent.includes('must-not-be-used'));
   await assert.rejects(run.prompt('with image',[{data:'image'}]),/accepts text/);await assert.rejects(run.prompt('fail'),/Quota unavailable/);assert(!run.hasContext());
+  for(const line of ['claude-opus-5-5-high\tClaude Opus 5.5 (High)','gpt-oss-120b-medium\tGPT-OSS 120B (Medium)']){
+   const selected=antigravityModels(line)[0],other=new AntigravityRun({...optionsForOther(),chat:{...chat,id:crypto.randomUUID(),model:selected.id,thinking:selected.defaultThinking}},cli,selected);
+   function optionsForOther(){return{cwd:root,systemPrompt:'Teach clearly.',mcpPath:join(root,'mcp.cjs'),toolEndpoint:'http://127.0.0.1:1/tools',toolToken:'private-fixture-token',directory:root,delta:(s:string)=>text+=s,activity:()=>{},auth:()=>{},saveSession:()=>{}};}
+   try{await other.prompt('Non-Google route');const packets=(await readFile(log,'utf8')).trim().split('\n').map(x=>JSON.parse(x)),launch=packets.filter(p=>p.args).at(-1);assert.equal(launch.args[launch.args.indexOf('--model')+1],selected.variants[selected.defaultThinking!]);assert(other.hasContext());}finally{other.close();}
+  }
  }finally{run.close();for(const [key,value]of [['GEMINI_API_KEY',before.gemini],['GOOGLE_API_KEY',before.google]]as const){if(value===undefined)delete process.env[key];else process.env[key]=value;}await rm(root,{recursive:true,force:true,maxRetries:3,retryDelay:100});}
 });
 
@@ -38,5 +43,9 @@ test('Antigravity rejects missing executables and immediate CLI exits without wa
    await assert.rejects(Promise.race([run.prompt('hello'),new Promise((_,reject)=>setTimeout(()=>reject(Error('Fixture response deadline exceeded')),2500))]),exists?/exit 17|EPIPE|ECONNRESET/:/ENOENT/);
    assert(!run.hasContext());
   }
+  await writeFile(cli,`#!${process.execPath}\nrequire('node:readline').createInterface({input:process.stdin}).on('line',()=>console.log(JSON.stringify({event:'result',result:{status:'ERROR',error:{message:'Provider unavailable',status:503}}})));`,{mode:0o700});
+  const outage=new AntigravityRun(options,cli,model);failed.push(outage);
+  await assert.rejects(outage.prompt('hello'),(error:any)=>error.message==='Provider unavailable'&&error.status===503);
+  assert(!outage.hasContext());
  }finally{failed.forEach(run=>run.close());await rm(root,{recursive:true,force:true,maxRetries:3,retryDelay:100});}
 });
