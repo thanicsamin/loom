@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { access, writeFile, mkdir } from 'node:fs/promises';
+import { access, writeFile, mkdir, readFile } from 'node:fs/promises';
 import { join, delimiter, dirname, basename } from 'node:path';
 import { createInterface } from 'node:readline';
 import { Readable, Writable } from 'node:stream';
@@ -22,8 +22,11 @@ const childEnvironment = (options: Options) => {
 export async function cliCommand(path:string,args:string[]){
   if(/\.(?:m?js)$/i.test(path))return{command:process.execPath,args:[path,...args]};
   if(process.platform!=='win32'||!path.toLowerCase().endsWith('.cmd'))return{command:path,args};
-  const scripts:Record<string,string>={claude:'@anthropic-ai/claude-code/cli.js',gemini:'@google/gemini-cli/dist/index.js',codex:'@openai/codex/bin/codex.js'};
-  const entry=scripts[basename(path,'.cmd')];if(!entry)throw Error('Unsupported CLI wrapper.');const script=join(dirname(path),'node_modules',entry);await access(script);return{command:process.execPath,args:[script,...args]};
+  const packages:Record<string,string>={claude:'@anthropic-ai/claude-code',gemini:'@google/gemini-cli',codex:'@openai/codex'};
+  const name=basename(path,'.cmd'),pkg=packages[name];if(!pkg)throw Error('Unsupported CLI wrapper.');
+  // Resolve the wrapper's real entry from package.json: newer Claude Code npm releases ship a native bin/claude.exe instead of cli.js.
+  const root=join(dirname(path),'node_modules',pkg),bin=JSON.parse(await readFile(join(root,'package.json'),'utf8')).bin,entry=typeof bin==='string'?bin:bin?.[name];if(!entry)throw Error('Unsupported CLI wrapper.');
+  const target=join(root,entry);await access(target);return /\.exe$/i.test(target)?{command:target,args}:{command:process.execPath,args:[target,...args]};
 }
 async function launch(path: string, args: string[], options: Options) {
   const resolved=await cliCommand(path,args);
@@ -46,7 +49,10 @@ export class ClaudeRun implements NativeRun {
     const configPath = join(this.options.directory, 'claude-mcp-' + this.options.chat.id + '.json');
     await mkdir(this.options.directory, { recursive: true });
     await writeFile(configPath, JSON.stringify({ mcpServers: { studio: { command: process.execPath, args: [this.options.mcpPath], env: { ELECTRON_RUN_AS_NODE: '1', STUDIO_TOOL_ENDPOINT: this.options.toolEndpoint, STUDIO_TOOL_TOKEN: this.options.toolToken, STUDIO_CHAT_ID: this.options.chat.id } } } }), { mode: 0o600 });
-    const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--tools', '', '--strict-mcp-config', '--mcp-config', configPath, '--allowedTools', 'mcp__studio__*', '--append-system-prompt', this.options.systemPrompt];
+    // The prompt (base + memory + PDF passages) can exceed Windows' 32,767-character command line, so pass it as a file.
+    const promptPath = join(this.options.directory, 'claude-prompt-' + this.options.chat.id + '.md');
+    await writeFile(promptPath, this.options.systemPrompt, { mode: 0o600 });
+    const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--tools', '', '--strict-mcp-config', '--mcp-config', configPath, '--allowedTools', 'mcp__studio__*', '--append-system-prompt-file', promptPath];
     if (this.options.chat.model && this.options.chat.model !== 'default') args.push('--model', this.options.chat.model);
     const sessionId = this.options.chat.sessionIds?.['claude-code']; if (sessionId) args.push('--resume', sessionId);
     this.child = await launch(executable, args, this.options);
