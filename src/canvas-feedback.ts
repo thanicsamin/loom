@@ -1,10 +1,10 @@
 type Item={id:string;label:string;status:'missing'|'partial'|'demonstrated'|'contradicted'|'uncertain';hint?:string};
 type Feedback={items:Item[]}| 'checking' | 'empty' | 'unavailable';
 const labels={missing:'Not yet shown',partial:'Add more detail',demonstrated:'Understanding demonstrated',contradicted:'Revisit this idea',uncertain:'Uncertain'};
-export function canvasFeedback(target:HTMLElement|string,result:Feedback){
+export function canvasFeedback(target:HTMLElement|string,result:Feedback,message?:string){
   const el=typeof target==='string'?document.querySelector<HTMLElement>(target):target;if(!el)return;
   const fragment=document.createDocumentFragment(),summary=document.createElement('div');summary.className='loom-feedback-summary';summary.setAttribute('role','status');
-  if(typeof result==='string'){summary.textContent={checking:'Checking…',empty:'Feedback appears after you write.',unavailable:'Feedback unavailable. Your answer is still saved.'}[result];fragment.append(summary);el.replaceChildren(fragment);return;}
+  if(typeof result==='string'){summary.textContent=result==='unavailable'&&message?message:{checking:'Checking…',empty:'Feedback appears after you write.',unavailable:'Feedback unavailable. Your answer is still saved.'}[result];fragment.append(summary);el.replaceChildren(fragment);return;}
   const items=result.items||[],all=items.length>0&&items.every(i=>i.status==='demonstrated');
   summary.textContent=items.some(i=>i.status==='contradicted')?'Revisit an idea':items.some(i=>i.status==='uncertain')?'Uncertain — try adding detail':all?'Understanding demonstrated':items.some(i=>i.status==='partial'||i.status==='demonstrated')?'Add more detail':'Keep going';
   summary.dataset.status=all?'demonstrated':items.some(i=>i.status==='contradicted')?'contradicted':'partial';fragment.append(summary);

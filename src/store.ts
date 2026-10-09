@@ -26,6 +26,19 @@ export function boundedJSON(value: unknown, limit = 65536): unknown {
   if (json.length > limit) throw Error('This interaction state is too large to save.');
   return JSON.parse(json);
 }
+export function migrateQuizState(canvas:Canvas):boolean{
+  const state=canvas.state;if(!state||typeof state!=='object'||Array.isArray(state))return false;
+  const old=(state as any).quizAnswers;if(!old||typeof old!=='object'||Array.isArray(old))return false;
+  const entries=Object.entries(old).filter(([k,v])=>k.length>0&&k.length<=200&&typeof v==='string'&&v.length<=32000);
+  let changed=false;if(!canvas.quizAnswers&&entries.length){canvas.quizAnswers=boundedJSON(Object.fromEntries(entries)) as Record<string,string>;changed=true;}
+  // The old quiz helper spread authored strings into numeric character keys.
+  // Recover that original string only when all keys form an exact character sequence.
+  const keys=Object.keys(state).filter(k=>k!=='quizAnswers').sort((a,b)=>Number(a)-Number(b));
+  if(keys.length&&keys.every((k,i)=>k===String(i)&&typeof (state as any)[k]==='string'&&(state as any)[k].length===1)){
+    const original=keys.map(k=>(state as any)[k]).join('');try{JSON.parse(original);canvas.state=original;changed=true;}catch{}
+  }
+  return changed;
+}
 export async function scopedPath(root: string, input: string, create = false): Promise<string> {
   if (typeof input !== 'string' || input.length > 2048 || input.includes('\0')) throw Error('Invalid file path.');
   const base = await realpath(root), candidate = resolve(base, input || '.');
@@ -53,8 +66,10 @@ export class Store {
   onChange(changed: () => void) { this.changed=changed; }
   async init() {
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
-    try { const saved = JSON.parse(await readFile(join(this.directory, 'workspace.json'), 'utf8')); if (saved.version !== 1 || !Array.isArray(saved.chats) || !Array.isArray(saved.projects)) throw Error('Workspace data has an unsupported format.'); this.db = saved; }
+    let original='';
+    try { original=await readFile(join(this.directory, 'workspace.json'), 'utf8');const saved = JSON.parse(original); if (saved.version !== 1 || !Array.isArray(saved.chats) || !Array.isArray(saved.projects)) throw Error('Workspace data has an unsupported format.'); this.db = saved; }
     catch (error: any) { if (error.code !== 'ENOENT') throw error; }
+    if(this.db.canvases.map(migrateQuizState).some(Boolean)){if(original)try{await writeFile(join(this.directory,'workspace-before-quiz-state.json'),original,{mode:0o600,flag:'wx'});}catch(e:any){if(e.code!=='EEXIST')throw e;}await this.commit();}
     if(!this.db.settings.judgeModel){this.db.settings.judge='opencode';this.db.settings.judgeModel=DEFAULT_JUDGE_MODEL;await this.commit();}
   }
   chat(id: string) { const chat = this.db.chats.find(c => c.id === id); if (!chat) throw Error('Chat not found.'); return chat; }
@@ -158,7 +173,7 @@ export class Store {
       canvas = this.canvas(input.id); if (canvas.chatId !== chatId) throw Error('This canvas belongs to another chat.');
       canvas.versions.push({ html: canvas.html, title: canvas.title, at: canvas.updatedAt, rubric: canvas.rubric });
       if (canvas.versions.length > 30) canvas.versions.shift();
-      Object.assign(canvas, { html: input.html, title, rubric, revision: canvas.revision + 1, updatedAt: Date.now(), ...(input.resetState ? { state: null } : {}) });
+      Object.assign(canvas, { html: input.html, title, rubric, revision: canvas.revision + 1, updatedAt: Date.now(), ...(input.resetState ? { state: null,quizAnswers:{} } : {}) });
     } else {
       this.chat(chatId);
       canvas = { id: randomUUID(), chatId, title, html: input.html, rubric, versions: [], state: null, revision: 1, updatedAt: Date.now() };
@@ -167,6 +182,10 @@ export class Store {
     await this.commit(); return { id: canvas.id, title, revision: canvas.revision };
   }
   async saveCanvasState(id: string, state: unknown) { this.canvas(id).state = boundedJSON(state); await this.commit(); }
+  async saveQuizAnswer(id:string,key:string,answer:string){
+    if(typeof key!=='string'||!key||key.length>200||typeof answer!=='string'||answer.length>32000)throw Error('Invalid saved quiz answer.');
+    const canvas=this.canvas(id);canvas.quizAnswers=boundedJSON({...canvas.quizAnswers,[key]:answer}) as Record<string,string>;await this.commit();
+  }
   async restoreCanvas(id: string, version: number) {
     const canvas = this.canvas(id), previous = canvas.versions[version]; if (!previous) throw Error('Revision not found.');
     return this.publishCanvas(canvas.chatId, { id, title: previous.title, html: previous.html, rubric: previous.rubric });

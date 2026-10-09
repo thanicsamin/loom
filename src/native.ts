@@ -12,8 +12,9 @@ export async function findCLI(name: string): Promise<string | undefined> {
   }
 }
 export interface NativeRun { hasContext?():boolean; prompt(text: string, images?: any[]): Promise<void>; steer(text: string, images?: any[]): Promise<void>; stop(): Promise<void>; close(): void; }
-type Options = { cwd: string; chat: Chat; systemPrompt: string; mcpPath: string; toolEndpoint: string; toolToken: string; directory: string; delta: (s: string) => void; activity: (s: string) => void; auth: (message: string, url?: string) => void; saveSession: (id: string) => void; };
-const childEnvironment = (options: Options) => {
+export type NativeOptions = { cwd: string; chat: Chat; systemPrompt: string; mcpPath: string; toolEndpoint: string; toolToken: string; directory: string; delta: (s: string) => void; activity: (s: string) => void; auth: (message: string, url?: string) => void; saveSession: (id: string) => void; };
+type Options = NativeOptions;
+export const childEnvironment = (options: Options) => {
   const env = { ...process.env, STUDIO_TOOL_ENDPOINT: options.toolEndpoint, STUDIO_TOOL_TOKEN: options.toolToken, STUDIO_CHAT_ID: options.chat.id, ELECTRON_RUN_AS_NODE: '1' };
   // A subscription connection must not silently select a separately billed API key.
   for (const key of ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'GEMINI_API_KEY', 'GOOGLE_API_KEY']) delete (env as any)[key];

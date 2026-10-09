@@ -9,3 +9,9 @@ test('HTTP/2 judge multiplexes checks and cancels one answer without reopening T
  try{await (await transport.fetch(url,{method:'HEAD'})).arrayBuffer();assert.equal(sessions,1);const abort=new AbortController();const old=transport.fetch(url,{method:'POST',body:'old',signal:abort.signal});void old.catch(()=>{});await wait(()=>received===1);abort.abort();await assert.rejects(old);const responses=await Promise.all(['new','another'].map(async body=>(await transport.fetch(url,{method:'POST',body})).json()));assert.deepEqual(responses,[{answer:'new'},{answer:'another'}]);assert.equal(received,3);assert.equal(sessions,1,'Cancelled checks retain the same HTTP/2 connection');}
  finally{await transport.close();await new Promise<void>(r=>server.close(()=>r()));await rm(root,{recursive:true,force:true});}
 });
+
+test('judge honors Retry-After and blocks edits from sending more requests during cooldown',async()=>{
+ const {createServer}=await import('node:http');let requests=0;
+ const server=createServer((_,response)=>{requests++;if(requests===1){response.writeHead(429,{'retry-after':'1'});response.end('Rate limited');}else response.end('Ready');});await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));const url=`http://127.0.0.1:${(server.address() as any).port}`,transport=new JevTransport();
+ try{await assert.rejects(transport.fetch(url),/rate limited/);for(let i=0;i<3;i++)await assert.rejects(transport.fetch(url),/seconds before checking/);assert.equal(requests,1);await new Promise(r=>setTimeout(r,1050));assert.equal(await(await transport.fetch(url)).text(),'Ready');assert.equal(requests,2);}finally{await transport.close();await new Promise<void>(r=>server.close(()=>r()));}
+});

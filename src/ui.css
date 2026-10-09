@@ -99,3 +99,5 @@ a:hover{ text-decoration-thickness:2px;text-underline-offset:3px }
 .markdown,.composer textarea,.reading-preview{font-family:"CMU Serif","Noto Serif",Georgia,serif}
 
 .project-chats{margin:0 0 4px 19px}.project-row>.icon-button{opacity:0}.project-row:hover>.icon-button,.project-row:focus-within>.icon-button{opacity:1}.files-browser{margin:5px 0 8px 19px;padding:6px;border-top:1px solid var(--line)}
+
+.retry-button{flex-shrink:0;border:1px solid currentColor;border-radius:6px;padding:5px 9px;font-size:inherit;color:var(--ink)}

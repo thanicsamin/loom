@@ -15,7 +15,7 @@ If your npm configuration blocks install scripts, run `node node_modules/electro
 
 Choose a provider in the chat header. Connect accounts in **Settings & connections**. Add a project folder to access your textbooks and papers. Click a PDF in **Files** to view pages, extracted text, or tables, then use **Explain this page**. Drag files into the window, use the attachment button, or paste an image.
 
-**Enter** sends a message. During a response, **Enter** steers the active run. **Shift+Enter** inserts a line break. **Stop** cancels a response. **Ctrl/Cmd+N** creates a chat; **Ctrl/Cmd+K** searches chats.
+**Enter** sends a message. During a response, **Enter** steers the active run. **Shift+Enter** inserts a line break. **Stop** cancels a response. Silent requests show a waiting state, stop after two minutes without progress, and offer **Retry** with the original message and attachments. Empty responses show an error; partial replies stay in the chat. Total response time is bounded to ten minutes. **Ctrl/Cmd+N** creates a chat; **Ctrl/Cmd+K** searches chats.
 
 ## Learning tools
 
@@ -35,7 +35,7 @@ Choose a provider in the chat header. Connect accounts in **Settings & connectio
 | --- | --- |
 | Codex subscription | Official `codex app-server` when installed; Pi subscription fallback otherwise |
 | Claude subscription | Official signed-in Claude Code CLI, streaming JSON + Loom MCP tools |
-| Gemini subscription | Official signed-in Gemini CLI, ACP + Loom MCP tools |
+| Gemini subscription | Official signed-in Antigravity CLI (`agy`), streaming JSON + Loom MCP tools; Gemini CLI/ACP when Antigravity is absent |
 | OpenCode Go | Pi, with a Go subscription key |
 | Jev feedback | Pi classifier route through TypeSafe AI, OpenRouter, or OpenCode Zen |
 
@@ -45,11 +45,13 @@ Loom prefers a verified private Codex installation in its data directory's `runt
 
 GPT-6.1 Sol and speed options come from the installed Codex runtime's model catalog. **Sol Ultrafast** appears as a speed option but is disabled unless that runtime/account advertises it. Loom does not silently substitute another tier. See the [official Codex speed documentation](https://learn.chatgpt.com/docs/agent-configuration/speed).
 
-Jev requests use the selected provider's API credits. OpenCode Zen and Go have separate credentials. A missing judge or uncertain answer produces an explicit state, never a fabricated score.
+Gemini models and thinking levels come from `agy models`, including Gemini 3.8 Flash when advertised. Loom pins the chosen model and uses the CLI’s existing Google subscription sign-in. It does not extract Google OAuth tokens, call private Google endpoints, or fall back to a separately billed API key. The current Antigravity input protocol accepts text; project PDFs can supply extracted text, while direct image inputs need another provider. See the [official headless protocol](https://antigravity.google/docs/cli/headless/).
+
+Jev requests use the selected provider's API credits. OpenCode Zen and Go have separate credentials. A missing judge or uncertain answer produces an explicit state, never a fabricated score. Editing pauses debounce checks, and HTTP 429 responses block more judge requests until the provider’s `Retry-After` period ends (one minute when absent). Loom does not automatically retry failed chat requests. Provider terms, account limits, and enforcement still apply; an official CLI integration is not a guarantee against account restrictions.
 
 Account/model discovery runs in the background. The UI and inline scripts do not receive account tokens. Linux/macOS credential files use private permissions; this prototype does not integrate an OS keychain. Windows credentials rely on the user's profile directory permissions.
 
-OpenCode Go's **Step 5 Preview Free** and **LongCat 2.5 Preview Free** appear first in its model list. A new Go chat defaults to Step 5 while the promo is available. The [official Go documentation](https://opencode.ai/docs/go/) lists both as free for a limited time. An explicitly selected unavailable model produces an error rather than switching to another model. Step 5 uses a conservative text-only registration until Pi supplies its full metadata; choose a model marked for images to inspect scanned pages.
+OpenCode Go's **Step 5 Preview Free** and **LongCat 2.5 Preview Free** appear first in its model list. A new Go chat defaults to Step 5 while the promo is available. The [official Go documentation](https://opencode.ai/docs/en/go/) currently lists LongCat as a limited free promotion; Step 5 is a compatibility registration from an earlier catalog and may no longer be offered. An entry in Loom’s catalog does not establish current availability. An explicitly selected unavailable model produces an error rather than switching to another model. Step 5 uses a conservative text-only registration until Pi supplies its full metadata; choose a model marked for images to inspect scanned pages.
 
 The initial window reads local chats and saved canvases before loading the model SDK. You can type while connections load. Streaming text is grouped once per display frame, preserving chunk order without rendering React for each token.
 
@@ -73,7 +75,18 @@ LOOM_LIVE_TEST=1 npm run test:live
 # Optional: LOOM_TEST_MODEL=longcat-2.5-preview-free
 ```
 
-See [VALIDATION.md](VALIDATION.md) for measured startup, interaction, and streaming results.
+Live provider checks also cover Go with GPT-6 Luna Low and Gemini 3.8 Flash Low. They use ordinary teaching requests and real source PDFs, rather than asking the assistant to add quizzes. These commands use connected accounts and consume their quotas:
+
+```sh
+LOOM_LIVE_TEST=1 node --import tsx tests/provider-live.ts generate
+LOOM_LIVE_TEST=1 node --import tsx tests/provider-live.ts interact
+LOOM_LIVE_TEST=1 node --import tsx tests/provider-live.ts gemini
+LOOM_LIVE_TEST=1 node --import tsx tests/provider-live.ts gemini-interact
+LOOM_LIVE_TEST=1 node --import tsx tests/provider-live.ts gemini-empty
+LOOM_LIVE_TEST=1 node --import tsx tests/provider-live.ts cleanup
+```
+
+The final command removes the private temporary account copies. Reports stay under ignored `test-results/providers/`. Set `ELECTRON_PATH` to a packaged executable to validate the installed build. See [VALIDATION.md](VALIDATION.md) for measured startup, interaction, and streaming results.
 
 Linux has been built and tested here. Packaging targets also exist for macOS DMG and Windows NSIS; those OS builds and subscription sign-in flows have not been tested here. Claude/Gemini live requests require installed official runtimes. Voice chat and dictation are deferred under the chat-only prototype scope.
 
@@ -85,6 +98,7 @@ Architecture details: [ARCHITECTURE.md](ARCHITECTURE.md). Rollback instructions:
 - [OptMem](https://github.com/VictorTaelin/OptMem) — the memory design inspiration; no upstream code copied
 - [pdf-parse](https://github.com/mehmet-kozan/pdf-parse) / PDF.js — parsing and page rendering
 - [arXiv API](https://info.arxiv.org/help/api/user-manual.html)
+- [Antigravity headless mode](https://antigravity.google/docs/cli/headless/), [workspace MCP](https://antigravity.google/docs/mcp?tab=cli), [rules](https://antigravity.google/docs/rules/)
 - [Codex app server](https://developers.openai.com/codex/app-server), [Claude Code CLI](https://code.claude.com/docs/en/cli-reference), [Gemini ACP](https://geminicli.com/docs/cli/acp-mode/)
 
 The logo is a vector outline from KaTeX's calligraphic font. The application bundles third-party open-source libraries under their respective licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
