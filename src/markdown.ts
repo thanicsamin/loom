@@ -1,4 +1,4 @@
-import { Marked, type TokenizerAndRendererExtension } from 'marked';
+import { Marked, Tokenizer, type TokenizerAndRendererExtension } from 'marked';
 import katex from 'katex';
 
 type Formula = { source: string; display: boolean };
@@ -72,7 +72,8 @@ export function parseMarkdown(text: string) {
   };
   const block: TokenizerAndRendererExtension = {
     name: 'loomMath', level: 'block',
-    start: src => { const match = /(?:^|\n)[ \t]*(?:\$\$|\\\[)/.exec(src); return match?.index; },
+    // Marked searches this hint from src.slice(1); only line breaks are safe.
+    start: src => { const match = /\n[ \t]{0,3}(?:\$\$|\\\[)/.exec(src); return match?.index; },
     tokenizer: src => {
       const leading = /^[ \t]{0,3}/.exec(src)![0];
       const token = formula(src.slice(leading.length));
@@ -81,7 +82,16 @@ export function parseMarkdown(text: string) {
       return { ...token, raw: leading + token.raw };
     }, renderer: render,
   };
-  const parser = new Marked({ gfm: true, breaks: false, extensions: [block, inline] });
+  const parser = new Marked({ gfm: true, breaks: false, extensions: [block, inline], tokenizer: {
+    lheading(src) {
+      const token = Tokenizer.prototype.lheading.call(this, src);
+      // A Setext heading may span several lines. Without this guard it can
+      // consume a display-math opener and an equation's standalone '=' line
+      // before the block extension gets to that formula.
+      if (token && /(?:^|\n)[ \t]{0,3}(?:\$\$|\\\[)/.test(token.text)) return;
+      return token;
+    },
+  } });
   return { html: parser.parse(text, { async: false }) as string, math };
 }
 
